@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101827"> <link rel="manifest" href="manifest.json">
+<title>McN AI</title>
+
+<style>
+:root {
+  --bg:#101827;
+  --panel:#182438;
+  --line:#2b3b53;
+  --accent:#42b8ff;
+  --text:#f4f7fb;
+  --muted:#aab8ca;
+}
+
+* { box-sizing:border-box; }
+[hidden] {
+    display: none !important;
+}
+body {
+  margin:0;
+  min-height:100vh;
+  background:linear-gradient(145deg,#0b1220,#17263c);
+  color:var(--text);
+  font:16px Arial,sans-serif;
+  display:flex;
+  justify-content:center;
+}
+
+main {
+  width:min(760px,100%);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  padding:14px;
+}
+
+header {
+  display:flex;
+  align-items:center;
+  gap:13px;
+  padding:18px 5px;
+}
+
+.logo {
+  width:48px;
+  height:48px;
+  border-radius:14px;
+  background:linear-gradient(135deg,#0879b9,#42b8ff);
+  display:grid;
+  place-items:center;
+  font-size:19px;
+  font-weight:bold;
+  color:white;
+}
+
+.brand h1 {
+  margin:0;
+  font-size:23px;
+}
+
+.brand p {
+  margin:5px 0 0;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.header-actions {
+  margin-left:auto;
+  display:flex;
+  gap:7px;
+}
+
+.small-btn {
+  padding:9px 11px;
+  border:1px solid var(--line);
+  background:#182438;
+  color:white;
+  border-radius:9px;
+}
+
+#chat {
+  flex:1;
+  min-height:300px;
+  max-height:70vh;
+  overflow-y:auto;
+  padding:18px;
+  background:rgba(24,36,56,.92);
+  border:1px solid var(--line);
+  border-radius:18px;
+}
+
+.msg {
+  max-width:88%;
+  padding:13px 15px;
+  margin-bottom:14px;
+  border-radius:15px;
+  line-height:1.5;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+
+.assistant {
+  background:#26364d;
+  border:1px solid #354962;
+}
+
+.user {
+  background:#0879b9;
+  margin-left:auto;
+}
+
+#status {
+  min-height:25px;
+  padding:8px 4px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+form {
+  display:flex;
+  gap:9px;
+  padding-top:8px;
+}
+
+input {
+  flex:1;
+  min-width:0;
+  padding:16px;
+  border-radius:13px;
+  border:1px solid var(--line);
+  background:#0d1726;
+  color:white;
+  font-size:16px;
+}
+
+.send-btn {
+  padding:0 22px;
+  border:0;
+  border-radius:13px;
+  background:var(--accent);
+  color:#071421;
+  font-weight:bold;
+}
+
+button { cursor:pointer; }
+button:disabled { opacity:.5; }
+
+.hint {
+  text-align:center;
+  color:var(--muted);
+  font-size:12px;
+  margin:13px 0;
+}
+
+@media(max-width:480px) {
+  main { padding:10px; }
+  #chat { padding:13px; }
+  .small-btn { font-size:11px; padding:8px; }
+  .send-btn { padding:0 15px; }
+}
+</style>
+</head>
+
+<body> <section id="loginScreen">
+    <h2>McN AI Login</h2>
+
+    <input
+        type="email"
+        id="loginEmail"
+        placeholder="Enter your email"
+    >
+
+    <input
+        type="password"
+        id="loginPassword"
+        placeholder="Enter your password"
+    >
+
+    <button onclick="signIn()">Login</button>
+<button type="button" onclick="window.signUp()">
+    Create Account
+</button>
+    <p id="authMessage"></p> 
+</section>
+<main id="chatApp" hidden>
+
+<header>
+  <div class="logo">McN</div>
+  <div class="brand">
+    <h1>McN AI</h1>
+    <p>Your intelligent AI assistant</p>
+  </div>
+<div class="header-actions">
+    <button class="small-btn" id="historyButton">History</button>
+    <button class="small-btn" id="newChat">New</button>
+    <button class="small-btn" id="clearChat">Clear</button>
+    <button class="small-btn" id="logoutButton">Logout</button>
+</div>
+  
+</header>
+<section id="historyPanel" hidden>
+  <h3>Chat History</h3>
+  <div id="historyList">
+    <p>No saved conversations yet.</p>
+  </div>
+</section>
+<section id="chat" aria-live="polite">
+  <div class="msg assistant">
+    Hello! Welcome to McN AI.
+
+    I'm ready to help with questions,
+    business tasks, and more.
+
+    What can I help you with today?
+  </div>
+</section>
+
+<div id="status" role="status"></div>
+
+<form id="chatForm">
+  <input
+    id="messageInput"
+    placeholder="Message McN AI..."
+    autocomplete="off"
+    required
+  >
+  <button class="send-btn" id="sendButton" type="submit">
+    Send
+  </button>
+</form>
+
+<p class="hint">Powered by McN AI</p>
+
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL =
+"https://wekrmuagikurmowglecl.supabase.co";
+
+const SUPABASE_ANON_KEY = "sb_publishable_c2XaDlZfdI3At6JYYKT1mg_fqXaURvB";
+
+
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+); window.signUp = async function() {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const message = document.getElementById("authMessage");
+
+    if (!email || !password) {
+        message.textContent = "Enter your email and password.";
+        return;
+    }
+
+    if (password.length < 6) {
+        message.textContent = "Password must be at least 6 characters.";
+        return;
+    }
+
+    message.textContent = "Creating your account...";
+
+    const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password
+    });
+
+    if (error) {
+        message.textContent = error.message;
+        return;
+    }
+
+    if (data.session) {
+        message.textContent = "Account created successfully!";
+        showChatApp();
+    } else {
+        message.textContent = "Check your email to confirm your account.";
+    }
+};
+
+window.signIn = async function() {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const message = document.getElementById("authMessage");
+
+    if (!email || !password) {
+        message.textContent = "Enter your email and password.";
+        return;
+    }
+
+    message.textContent = "Signing in...";
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+    });
+
+    if (error) {
+        message.textContent = error.message;
+        return;
+    }
+
+    message.textContent = "Login successful!";
+    showChatApp();
+};
+function showChatApp() {
+    document.getElementById("loginScreen").hidden = true;
+    document.getElementById("chatApp").hidden = false;
+} console.log("McN AI Supabase client loaded:", !!supabaseClient); async function checkLoginSession() {
+    const { data, error } =
+        await supabaseClient.auth.getSession();
+
+    if (error) {
+        console.error("Session error:", error.message);
+        return;
+    }
+
+    if (data.session) {
+        showChatApp();
+    }
+}
+
+checkLoginSession();
+const EDGE_FUNCTION_NAME = "rapid-task";
+
+const chat = document.getElementById("chat");
+const form = document.getElementById("chatForm");
+const input = document.getElementById("messageInput");
+const sendButton = document.getElementById("sendButton");
+const statusBox = document.getElementById("status");
+
+
+const STORAGE_KEY = "mcn_ai_chat_history"; const CONVERSATIONS_KEY = "mcn_ai_saved_conversations"; const ACTIVE_CONVERSATION_KEY = "mcn_ai_active_conversation";
+let activeConversationId = null; activeConversationId =
+    localStorage.getItem(ACTIVE_CONVERSATION_KEY);
+
+let history = [];
+
+function saveHistory() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  } catch (error) {
+    statusBox.textContent = "Could not save chat history.";
+  }
+}
+
+function loadHistory() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        history = saved ? JSON.parse(saved) : [];
+
+        if (!Array.isArray(history)) history = [];
+
+        chat.innerHTML = "";
+
+        if (history.length === 0) {
+            addMessage(
+                "Hello! I'm McN AI. What would you like help with?",
+                "assistant"
+            );
+            return;
+        }
+
+        history.forEach(item => {
+            const role =
+                item.role === "assistant" || item.role === "model"
+                    ? "assistant"
+                    : "user";
+
+            const messageText =
+                item.content || item.text ||
+                item.parts?.[0]?.text || "";
+
+            addMessage(messageText, role);
+        });
+
+    } catch (error) {
+        console.error("History loading error:", error);
+        history = [];
+    }
+}
+
+function getSavedConversations() {
+    try {
+        return JSON.parse(
+            localStorage.getItem(CONVERSATIONS_KEY) || "[]"
+        );
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveCurrentConversation() {
+    if (!history.length) return;
+
+    if (!activeConversationId) {
+        activeConversationId = Date.now().toString();
+    }
+
+    localStorage.setItem(
+        ACTIVE_CONVERSATION_KEY,
+        activeConversationId
+    );
+
+    const firstMessage = history.find(
+        item => item.role === "user"
+    );
+
+    const title = firstMessage
+        ? (
+            firstMessage.content ||
+            firstMessage.text ||
+            "New conversation"
+        ).slice(0, 40)
+        : "New conversation";
+
+    const conversations = getSavedConversations();
+
+    const conversation = {
+        id: activeConversationId,
+        title,
+        messages: history,
+        updatedAt: new Date().toISOString()
+    };
+
+    const index = conversations.findIndex(
+        item => item.id === activeConversationId
+    );
+
+    if (index >= 0) {
+        conversations[index] = conversation;
+    } else {
+        conversations.push(conversation);
+    }
+
+    localStorage.setItem(
+        CONVERSATIONS_KEY,
+        JSON.stringify(conversations)
+    );
+}
+
+function renderSavedConversations() {
+    const list = document.getElementById("historyList");
+    const conversations = getSavedConversations();
+
+    list.innerHTML = "";
+
+    if (conversations.length === 0) {
+        list.textContent = "No saved conversations yet.";
+        return;
+    }
+
+    conversations.sort(
+        (a, b) =>
+            new Date(b.updatedAt) - new Date(a.updatedAt)
+    );
+
+    conversations.forEach(conversation => {
+        const button = document.createElement("button");
+
+        button.className = "small-btn";
+        button.textContent =
+            conversation.title || "Untitled conversation";
+
+        button.style.display = "block";
+        button.style.width = "100%";
+        button.style.marginBottom = "8px";
+
+        button.addEventListener("click", function () {
+            openSavedConversation(conversation.id);
+        });
+
+        list.appendChild(button);
+    });
+}
+
+function openSavedConversation(id) {
+    const conversations = getSavedConversations();
+
+    const conversation = conversations.find(
+        item => item.id === id
+    );
+
+    if (!conversation) return;
+
+    saveCurrentConversation();
+
+    history = conversation.messages || [];
+    activeConversationId = conversation.id;
+
+    localStorage.setItem(
+        ACTIVE_CONVERSATION_KEY,
+        activeConversationId
+    );
+
+    saveHistory();
+    loadHistory();
+
+    document.getElementById("historyPanel").hidden = true;
+}
+
+function addMessage(text, role) {
+  const bubble = document.createElement("div");
+  bubble.className = "msg " + role;
+  bubble.textContent = text;
+  chat.appendChild(bubble);
+  chat.scrollTop = chat.scrollHeight;
+  return bubble;
+}
+
+document.getElementById("clearChat").onclick = () => {
+    history = [];
+    activeConversationId = null;
+
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+
+    chat.innerHTML = "";
+
+    addMessage(
+        "Conversation cleared. How can I help?",
+        "assistant"
+    );
+
+    statusBox.textContent = "";
+};
+
+document.getElementById("newChat").onclick = () => {
+    saveCurrentConversation();
+
+    history = [];
+    activeConversationId = null;
+
+    saveHistory();
+    localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+
+    chat.innerHTML = "";
+
+    addMessage(
+        "Hello! I'm McN AI. What would you like help with?",
+        "assistant"
+    );
+
+    statusBox.textContent = "";
+};
+document.getElementById("logoutButton").onclick = async () => {
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) {
+        statusBox.textContent = error.message;
+        return;
+    }
+
+    document.getElementById("chatApp").hidden = true;
+    document.getElementById("loginScreen").hidden = false;
+
+    document.getElementById("authMessage").textContent =
+        "You have been logged out.";
+
+    document.getElementById("loginPassword").value = "";
+};
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const message = input.value.trim();
+  if (!message) return;
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    statusBox.textContent =
+     "sb_publishable_c2XaDlZfdI3At6JYYKT1mg_fqXaURvB" ;
+    return;
+  }
+
+  addMessage(message, "user");
+  input.value = "";
+  sendButton.disabled = true;
+
+  const typing = addMessage("McN AI is thinking...", "assistant");
+  statusBox.textContent = "Connecting...";
+
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/${EDGE_FUNCTION_NAME}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "apikey": SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ message, history })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || data.message ||
+        `Request failed (${response.status})`
+      );
+    }
+
+    const answer =
+      data.answer || data.reply ||
+      "The AI returned an empty response.";
+
+    typing.textContent = answer;
+
+    history.push(
+      { role: "user", content: message },
+      { role: "assistant", content: answer }
+    ); saveHistory(); saveCurrentConversation();
+
+    statusBox.textContent = "";
+
+  } catch (error) {
+    typing.textContent =
+      "I couldn't connect right now. " + error.message;
+
+    statusBox.textContent =
+      "Check your Supabase connection.";
+  } finally {
+    sendButton.disabled = false;
+    input.focus();
+  }
+});const savedActiveId =
+    localStorage.getItem(ACTIVE_CONVERSATION_KEY);
+
+if (savedActiveId) {
+    const conversations = getSavedConversations();
+
+    const activeChat = conversations.find(
+        item => item.id === savedActiveId
+    );
+
+    if (activeChat) {
+        history = activeChat.messages || [];
+        activeConversationId = activeChat.id;
+        saveHistory();
+    }
+}
+
+loadHistory(); document.getElementById("historyButton")
+    .addEventListener("click", function () {
+        const panel = document.getElementById("historyPanel");
+
+        panel.hidden = !panel.hidden;
+
+        if (!panel.hidden) {
+            renderSavedConversations();
+        }
+    });
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./service-worker.js")
+            .then(function () {
+                console.log("McN AI service worker registered!");
+            })
+            .catch(function (error) {
+                console.error("Service worker registration failed:", error);
+            });
+    });
+}
+</script>
+
+</body>
+</html>
